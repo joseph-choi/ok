@@ -982,7 +982,7 @@ class SubmissionAPI(APIResource):
         """
         Sets composition score
 
-         :param obj: (object) target
+        :param obj: (object) target
         :param user: (object) caller
         :param data: (dictionary) data
         :return: (int) score
@@ -1304,6 +1304,17 @@ class GroupAPI(APIResource):
     }
 
     def add_member(self, group, user, data):
+        """
+        Add a member to a group, upon successful invitation.
+        - check if user is already invited
+        - check if user is already in group
+        - check if user is valid
+
+        :param group: (object)
+        :param user: (object) caller
+        :param data: (dictionary) data
+        :return: None or Error
+        """
         need = Need('invite')
         if not group.can(user, need, group):
             raise need.exception()
@@ -1326,6 +1337,14 @@ class GroupAPI(APIResource):
         audit_log_message.put()
 
     def remove_member(self, group, user, data):
+        """
+        Remove user from a group, by email.
+
+        :param group: (object)
+        :param user: (object) caller
+        :param data: (dictionary) data
+        :return: None
+        """
         need = Need('remove')
         if not group.can(user, need, group):
             raise need.exception()
@@ -1343,6 +1362,14 @@ class GroupAPI(APIResource):
             audit_log_message.put()
 
     def invite(self, group, user, data):
+        """
+        Invite a target user into the group, by email.
+
+        :param group (object)
+        :param user: (object) caller
+        :param data: (dictionary) data
+        :return: None or Error
+        """
         need = Need('invite')
         if not group.can(user, need, group):
             return need.exception()
@@ -1352,6 +1379,14 @@ class GroupAPI(APIResource):
             raise BadValueError(error)
 
     def accept(self, group, user, data):
+        """
+        Accept an invitation into a group
+
+        :param group (object)
+        :param user: (object) caller
+        :param data: -- unused --
+        :return: None or Exception
+        """
         need = Need('accept')
         if not group.can(user, need, group):
             raise need.exception()
@@ -1359,9 +1394,25 @@ class GroupAPI(APIResource):
         group.accept(user)
 
     def decline(self, group, user, data):
+        """
+        Declining an invite equals exiting the group.
+
+        :param group: (object)
+        :param user: (object) caller
+        :param data: -- unused --
+        :return: None
+        """
         self.exit(group, user, data)
 
     def exit(self, group, user, data):
+        """
+        User leaves group
+
+        :param group: (object)
+        :param user: (object) caller
+        :param data: -- unused --
+        :return: None
+        """
         need = Need('exit')
         if not group.can(user, need, group):
             raise need.exception()
