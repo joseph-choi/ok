@@ -322,11 +322,18 @@ class BackupAPITest(APITest, APIBaseTestCase):
         self.get_index(created='<|%s' % str(time - datetime.timedelta(hours=7)))
         self.assertJson([inst.to_json()])
 
-    def test_add_grade(self):
-        inst = self.get_basic_instance()
+    def test_grade(self):
+        inst = self.get_basic_instance(mutate=True)
+        #create a fake grade to upload
         inst.grade = make_fake_grade(25.7)
         self.post_entity(inst)
         self.assertStatusCode(201)
+        #check that grade is successfully added
+        self.get_entity(inst)
+        self.assertJson(inst.to_json())
+        self.assertEqual(inst.grade, make_fake_grade(25.7))
+  
+
 
 class CourseAPITest(APITest, APIBaseTestCase):
     model = models.Course
