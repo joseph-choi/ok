@@ -14,7 +14,7 @@ import os
 os.environ['FLASK_CONF'] = 'TEST'
 import datetime
 from test_base import APIBaseTestCase, unittest #pylint: disable=relative-import
-from test_base import make_fake_assignment, make_fake_course, make_fake_grade #pylint: disable=relative-import
+from test_base import make_fake_assignment, make_fake_course, make_fake_backup, make_fake_grade #pylint: disable=relative-import
 from google.appengine.ext import ndb
 from app import models, constants
 from ddt import ddt, data, unpack
@@ -332,17 +332,6 @@ class BackupAPITest(APITest, APIBaseTestCase):
 
         self.get_index(created='<|%s' % str(time - datetime.timedelta(hours=7)))
         self.assertJson([inst.to_json()])
-
-    def test_grade(self):
-        inst = self.get_basic_instance(mutate=True)
-        #create a fake grade to upload
-        inst.grade = make_fake_grade(25.7)
-        self.post_entity(inst)
-        self.assertStatusCode(201)
-        #check that grade is successfully added
-        self.get_entity(inst)
-        self.assertJson(inst.to_json())
-        self.assertEqual(inst.grade, make_fake_grade(25.7))
   
 
 
@@ -375,6 +364,59 @@ class VersionAPITest(APITest, APIBaseTestCase):
             self.num += 1
         return self.model(key=ndb.Key(self.model._get_kind(), name),
             name=name, versions=['1.0.0', '1.1.0'], base_url="https://www.baseurl.com")
+
+
+class SubmissionAPITest(APITest, APIBaseTestCase):
+    model = models.Submission
+    name = 'submission'
+    num = 1
+    access_token = 'dummy_admin'
+
+    def setUp(self):
+        super(SubmissionAPITest, self).setUp()
+        self._course = make_fake_course(self.user)
+        self._course.put()
+        self._assign = make_fake_assignment(self._course, self.user)
+        self._assign.put()
+        self._submitter = self.accounts['dummy_student']
+        self._submitter.put()
+        self._backup = make_fake_backup(self._submitter, self._assign)
+        self._backup.put()
+
+    def get_basic_instance(self, mutate=True):
+        rval = models.Submission(
+            backup=self._backup.key
+            )
+        return rval
+
+    def post_entity(self, inst, *args, **kwds):
+        """Posts an entity to the server."""
+        data = inst.to_json()
+        data['messages'] = data['backup']['messages']
+        data['backup'] = data['backup']['id']
+        data['submitter'] = data['submitter']['id']
+        data['assignment'] = data['assignment']['name']
+
+        self.post_json('/{}'.format(self.name),
+                       data=data, *args, **kwds)
+        if self.response_json and 'key' in self.response_json:
+            if inst.key:
+                self.assertEqual(inst.key.id(), self.response_json['key'])
+            else:
+                inst.key = models.ndb.Key(self.model,
+                                          self.response_json.get('key'))
+
+    def test_autograde(self):
+        inst = self.get_basic_instance(mutate=True)
+        #create a fake grade to upload
+        inst.score.append(make_fake_grade(25))
+        self.post_entity(inst)
+        self.assertStatusCode(201)
+        #check that grade is successfully added
+        self.get_entity(inst)
+        self.assertJson(inst.to_json())
+        self.assertEqual(inst.score[-1], make_fake_grade(25))
+
 
 
 class GroupAPITest(APITest, APIBaseTestCase):

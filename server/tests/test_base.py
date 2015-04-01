@@ -61,10 +61,19 @@ def make_fake_assignment(course, creator):
         max_group_size=4,
         due_date=datetime.datetime.now())
 
+def make_fake_backup(submitter, assignment):
+    return models.Backup(
+        submitter=submitter.key,
+        assignment=assignment.key,
+        messages=[models.Message(
+                    kind='file_contents', contents={"trends.py": ""})],
+        )
+
 def make_fake_grade(grade):
-    return models.Grade(
-        grade=grade,
-        message="This is a fake grade.")
+    return models.Score(
+        score=grade,
+        message="This is a fake autograder score.",
+        autograder=True)
 
 def make_fake_creator():
     """
