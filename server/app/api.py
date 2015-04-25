@@ -1334,6 +1334,11 @@ class CourseAPI(APIResource):
                 'student': KeyArg('User', required=True)
             }
         },
+        'autograde': {
+            'web_args': {
+                'assignment': Arg(str, required=True)
+            }
+        },
         }
 
     def post(self, user, data):
@@ -1394,6 +1399,13 @@ class CourseAPI(APIResource):
 
     def assignments(self, course, user, data):
         return list(course.assignments)
+
+    def autograde(self, course, user, data):
+        need = Need('staff')
+        if not course.can(user, need, course):
+            raise need.exception()
+        add_all_to_taskqueue(course, data['assignment']) # add all final submissions of assignment in course to the task queue
+        # remote run script to start grading
 
 
 class GroupAPI(APIResource):
