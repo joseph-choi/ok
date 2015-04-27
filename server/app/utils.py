@@ -22,7 +22,6 @@ from google.appengine.ext import deferred
 from google.appengine.api import taskqueue
 
 from app import app
-from app.constants import STUDENT_ROLE
 
 # TODO Looks like this can be removed just by relocating parse_date
 # To deal with circular imports
@@ -289,6 +288,8 @@ def assign_submission(backup_id, submit):
         if datetime.datetime.now() < assign.get_result().due_date:
             subm.mark_as_final()
 
+        add_taskqueue(subm)
+
 def sort_by_assignment(key_func, entries):
     entries = sorted(entries, key=key_func)
     return itertools.groupby(entries, key_func)
@@ -412,11 +413,16 @@ def check_user(user_key):
 # Autograder actions #
 ######################
 
-def add_taskqueue(backup):
+def add_taskqueue(submission):
     q = taskqueue.Queue("pull-queue")
-    submission_contents = backup.get_messages.get("file_contents")
+    backup = submission.backup.get()
+    submission_contents = backup.get_messages().get("file_contents")
+    tag = str(backup.submitter.id())
+    sub_id = str(submission.key.id())
+
+    submission_contents["submission_id"] = sub_id
     tasks = []
-    tasks.append(taskqueue.Task( payload = submission_contents, method = "PULL"))
+    tasks.append(taskqueue.Task( payload = str(submission_contents), method = "PULL", tag = tag))
     q.add(tasks)
 
 def add_all_taskqueue(course, assign_key):
@@ -424,11 +430,12 @@ def add_all_taskqueue(course, assign_key):
     students = course.students()  
     final_submissions = [student.get().get_final_submission(assign_key) for student in students]
     submissions = [final.submission.get() for final in final_submissions]
-    backups = [sub.backup.get() for sub in submissions]
+    backups = [(sub.backup.get(), str(sub.key.id())) for sub in submissions]
 
     tasks = []
-    for backup in backups:
-        submission_contents = backup.get_messages.get("file_contents")
+    for backup, sub_id in backups:
+        submission_contents = backup.get().get_messages.get("file_contents")
+        submission_contents["submission_id"] = sub_id
         tasks.append(taskqueue.Task( payload = submission_contents, method = "PULL"))
     q.add(tasks)
 
@@ -450,4 +457,3 @@ def lease_tasks():
         tasks = q.lease_tasks(day_seconds, max_tasks)
 
     return backups
-
